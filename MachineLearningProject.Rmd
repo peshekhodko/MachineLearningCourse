@@ -1,0 +1,114 @@
+---
+title: "Machine Learning Course Project"
+output: html_document
+---
+##Sinopsis##
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. The goal of this project is to predict the manner in which people did the exercise. This is the "classe" variable in the training set.
+
+## Data preprocessing ##
+
+ **Loading data**
+
+Load necessary libraries
+```{r, message=F, warning=F}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+Load training and testing data sets
+```{r}
+train_data <- read.csv("pml-training.csv")
+test_data <- read.csv("pml-testing.csv")
+```
+
+Checking dimensions of both sets
+```{r}
+dim(train_data)
+dim(test_data)
+```
+
+**Cleaning and partitioning data**
+
+Remove near zero variance variables and get rid off personal information which should not be included in model prediction
+```{r}
+nearzero <- nearZeroVar(train_data, saveMetrics = TRUE)
+train_data <- train_data[, !nearzero$nzv]
+train_data <- train_data[ , -c(1:6)]
+```
+
+
+Create particions of train data. I will split up train data in 2 parts: 60% for train data and 40 % for test data  
+```{r}
+inTrain <- createDataPartition(y=train_data$classe, p=0.6, list=FALSE)
+train <- train_data[inTrain, ]
+test  <- train_data[-inTrain, ]
+```
+
+Let's look on the data
+
+```{r}
+table(train$classe)
+```
+As we can see the each type of exercises has the same order of magnitude. Level A is the most frequent with more than 3000 and level D is less frequent with around 1900.
+
+
+## Prediction with trees ##
+
+Let's use trees model for data prediction
+
+```{r}
+modelTree <- rpart(classe ~ ., data=train, method="class")
+```
+
+And now build classification tree based on the estimated model:
+
+```{r}
+rpart.plot(modelTree, extra = 102, under = TRUE, faclen = 0, main = "Classification Tree")
+
+```
+
+Then we will apply our model on the test part of the training data set:
+
+```{r}
+predictionTree <- predict(modelTree, test, type = "class")
+```
+
+And then build confusion matrix:
+```{r}
+confusionMatrix(predictionTree, test$classe)
+```
+
+## Prediction with Random Forests ##
+
+Apply Random Forests model on the trainung dataset
+```{r}
+modelFitRF <- randomForest(classe ~. , data=train, method="class", na.action=na.roughfix)
+```
+
+Use created model for predictions on the test dataset and build confusion matrix:
+```{r}
+predictionsRF <- predict(modelFitRF, test, type = "class")
+confusionMatrix(predictionsRF, test$classe)
+```
+
+## Conclusions ##
+
+Based on the investigations above I will select `RANDOM FORESTS` prediction model. As it has much more better accurancy `0.99` (with `95% CONFIDENCE INTERVAL 0.96, 0.9998`) comparing with accurancy `0.74` (with `95% CONFIDENCE INTERVAL 0.7325, 0.7519`) for `PREDICTION TREE` prediction model.
+
+## Appendix ##
+**Generate files for submission**
+```{r}
+predictions_testing <- predict(modelFitRF, test_data, type = "class")
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictions_testing)
+```
